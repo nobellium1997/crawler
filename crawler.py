@@ -4,6 +4,7 @@ import asyncio
 import aiohttp
 import urllib
 import sys
+import os
 import concurrent.futures
 from collections import deque, Counter
 from typing import List
@@ -39,11 +40,16 @@ def crawl(url):
 
     print(f"Time taken: {time.time() - start_time}")
 
+
 def get_child_links(url):
     # Get the file from the repository
     # or download the page if it doesn't exist.
     url_key = url_to_key(url)
-    with open(f"./crawler_repository/{url_key}") as f:
+    file_path = f"./crawler_repository/{url_key}"
+    if not os.path.exists(file_path):
+        return []
+
+    with open(file_path) as f:
         page = f.read()
 
     child_links = []
@@ -62,29 +68,21 @@ def url_to_key(url):
     return urllib.parse.quote_plus(url.lstrip("http://").lstrip("https://").strip("/"))
 
 
-def data_to_file(url, response):
-    url_key = url_to_key(url)
-    with open(f"./crawler_repository/{url_key}", "wb") as f:
-        f.write(response)
-
-async def get(url, session):
+async def get_page(url, session):
     try:
         async with session.get(url=url) as response:
-            resp = await response.read()
-            # print("Successfully got url {} with resp of length {}.".format(url, len(resp)))
-            return resp
+            response = await response.read()
+            url_key = url_to_key(url)
+            with open(f"./crawler_repository/{url_key}", "wb") as f:
+                f.write(response)
     except Exception as e:
         print(e)
 
 
 async def download_links(urls):
     try:
-        unique_urls = [url for url in urls if DUPLICATES[url_to_key(url)] == 0]
         async with aiohttp.ClientSession() as session:
-            responses = await asyncio.gather(*[ get(url, session) for url in unique_urls])
-
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            executor.map(data_to_file, unique_urls, responses)
+            await asyncio.gather(*[ get_page(url, session) for url in urls])
 
     except Exception as e:
         print(e)
