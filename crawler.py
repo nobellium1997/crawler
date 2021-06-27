@@ -4,6 +4,7 @@ import asyncio
 import aiohttp
 import urllib
 import sys
+import concurrent.futures
 from collections import deque, Counter
 from typing import List
 from bs4 import BeautifulSoup, SoupStrainer
@@ -16,8 +17,8 @@ def crawl(url):
     queue = deque()
     queue.appendleft(url)
     asyncio.run(download_links([url]))
-    template = 'time()# {:0.2f}, perf_counter()# {:0.2f}'
-    print("Start time " + template.format(time.time(), time.perf_counter()))
+
+    start_time = time.time()
     counter = 0
     # Begin BFS crawl
     while len(queue) > 0:
@@ -27,17 +28,16 @@ def crawl(url):
 
         print(curr_url)
         child_links = get_child_links(curr_url)
-        print("Fetch time " + template.format(time.time(), time.perf_counter()))
         asyncio.run(download_links(child_links))
-        print("Downoad time " + template.format(time.time(), time.perf_counter()))
 
         for child_link in child_links:
             queue.appendleft(child_link)
 
-        if counter == 5:
+        if counter == 10:
             break
         counter += 1
 
+    print(f"Time taken: {time.time() - start_time}")
 
 def get_child_links(url):
     # Get the file from the repository
@@ -62,6 +62,11 @@ def url_to_key(url):
     return urllib.parse.quote_plus(url.lstrip("http://").lstrip("https://").strip("/"))
 
 
+def data_to_file(url, response):
+    url_key = url_to_key(url)
+    with open(f"./crawler_repository/{url_key}", "wb") as f:
+        f.write(response)
+
 async def get(url, session):
     try:
         async with session.get(url=url) as response:
@@ -69,17 +74,18 @@ async def get(url, session):
             # print("Successfully got url {} with resp of length {}.".format(url, len(resp)))
             return resp
     except Exception as e:
-        print("Unable to get url {} due to {}.".format(url, e.__class__))
+        print(e)
 
 
 async def download_links(urls):
     try:
+        unique_urls = [url for url in urls if DUPLICATES[url_to_key(url)] == 0]
         async with aiohttp.ClientSession() as session:
-            responses = await asyncio.gather(*[ get(url, session) for url in urls if DUPLICATES[url_to_key(url)] == 0 ])
-        for url, response in zip(urls, responses):
-            url_key = url_to_key(url)
-            with open(f"./crawler_repository/{url_key}", "wb") as f:
-                f.write(response)
+            responses = await asyncio.gather(*[ get(url, session) for url in unique_urls])
+
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            executor.map(data_to_file, unique_urls, responses)
+
     except Exception as e:
         print(e)
 
