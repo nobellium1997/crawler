@@ -68,6 +68,8 @@ def get_child_links(url):
 
 
 def url_to_key(url):
+    # This method is mainly to convert urls to just their domain and base path
+    # and also urlencode the entire string so that the page can be saved as a file.
     return urllib.parse.quote_plus(url.lstrip("http://").lstrip("https://").strip("/"))
 
 
