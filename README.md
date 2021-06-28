@@ -17,8 +17,10 @@ pip3 install -r requirements.txt
 
 To run the crawler, all you need to do is run the script followed by a starting url.
 
+For example:
+
 ``` sh
-python3 crawler.py
+python3 crawler.py "https://rescale.com" 
 ```
 
 #### Testing:
