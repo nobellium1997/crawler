@@ -8,7 +8,6 @@ import os
 import logging
 import concurrent.futures
 from collections import deque, Counter
-from typing import List
 from bs4 import BeautifulSoup, SoupStrainer
 
 DUPLICATES = Counter()
