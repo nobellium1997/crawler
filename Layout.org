@@ -1,7 +1,0 @@
-#+TITLE: Layout
-
-* Design:
-** Pull from queue and print site as root (if queue is empty break)
-** Parse urls from site and print indented
-** Multi-threaded download of each site into a file store and add to queue
-** Start loop over
