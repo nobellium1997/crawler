@@ -5,21 +5,25 @@ import aiohttp
 import urllib
 import sys
 import os
+import logging
 import concurrent.futures
 from collections import deque, Counter
 from typing import List
 from bs4 import BeautifulSoup, SoupStrainer
-import time
 
 DUPLICATES = Counter()
+logging.basicConfig(filename='errors.log', level=logging.ERROR)
 
 def crawl(url):
+    # Initialize repository for page storage
+    if not os.path.exists("./crawler_repository"):
+        os.mkdir("./crawler_repository")
+
     # Initialize the queue for our BFS search of child nodes in the graph
     queue = deque()
     queue.appendleft(url)
     asyncio.run(download_links([url]))
 
-    start_time = time.time()
     counter = 0
     # Begin BFS crawl
     while len(queue) > 0:
@@ -34,34 +38,34 @@ def crawl(url):
         for child_link in child_links:
             queue.appendleft(child_link)
 
-        if counter == 10:
-            break
-        counter += 1
-
-    print(f"Time taken: {time.time() - start_time}")
-
 
 def get_child_links(url):
-    # Get the file from the repository
-    # or download the page if it doesn't exist.
-    url_key = url_to_key(url)
-    file_path = f"./crawler_repository/{url_key}"
-    if not os.path.exists(file_path):
+    # Get the file from the repsoitory or
+    # return an empty list if it doesn't exist in the
+    # repository.
+    try:
+        url_key = url_to_key(url)
+        file_path = f"./crawler_repository/{url_key}"
+        if not os.path.exists(file_path):
+            return []
+
+        with open(file_path) as f:
+            page = f.read()
+
+        child_links = []
+        parser = 'html.parser'
+        soup = BeautifulSoup(page, parser)
+
+        for link in soup.find_all('a', href=True):
+            if link["href"].startswith("http") and DUPLICATES[url_to_key(link["href"])] == 0:
+                print(f"\t{link['href']}")
+                child_links.append(link["href"])
+
+        return child_links
+
+    except Exception as e:
+        logging.error(e)
         return []
-
-    with open(file_path) as f:
-        page = f.read()
-
-    child_links = []
-    parser = 'html.parser'
-    soup = BeautifulSoup(page, parser)
-
-    for link in soup.find_all('a', href=True):
-        if link["href"].startswith("http") and DUPLICATES[url_to_key(link["href"])] == 0:
-            print(f"\t{link['href']}")
-            child_links.append(link["href"])
-
-    return child_links
 
 
 def url_to_key(url):
@@ -76,16 +80,19 @@ async def get_page(url, session):
             with open(f"./crawler_repository/{url_key}", "wb") as f:
                 f.write(response)
     except Exception as e:
-        print(e)
+        logging.error(e)
 
 
 async def download_links(urls):
+    # Asynchronously download each page so that the thread
+    # doesn't block for a single long download.
     try:
         async with aiohttp.ClientSession() as session:
-            await asyncio.gather(*[ get_page(url, session) for url in urls])
+            await asyncio.gather(*[get_page(url, session) for url in urls])
 
     except Exception as e:
-        print(e)
+        logging.error(e)
+
 
 
 if __name__ == "__main__":
